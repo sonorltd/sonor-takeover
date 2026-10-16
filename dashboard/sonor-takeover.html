@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="graphite">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Takeover — Sonor</title>
+<link rel="icon" href="../data/favicon.svg" type="image/svg+xml">
+<!-- Spine v1.3 import order (§2 / S-4.1.a): theme FIRST, brand.css, served kit, shared chrome, then the app alias layer. Synced copies — masters at workspace root. -->
+<script src="../data/sonor-theme.js"></script>
+<link rel="stylesheet" href="../data/brand.css">
+<script type="module" src="https://sonorltd.github.io/sonor-kit/v1/kit.js" onerror="import('./../data/kit/kit.js')"></script>
+<link rel="stylesheet" href="../data/sonor-header.css">
+<link rel="stylesheet" href="../data/sonor-components.css">
+<link rel="stylesheet" href="../data/app-vars.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../sonor-db.js"></script>
+<script src="../data/sonor-brand.js"></script>
+<script src="../data/sonor-app.js"></script>
+<script src="../data/sonor-header.js"></script>
+<!-- SONOR SHELL (Spine v1.3 §21 / S-4.21) — palette BEFORE shell -->
+<script src="../data/sonor-palette.js"></script>
+<script src="../data/sonor-shell.js"></script>
+<link rel="stylesheet" href="../data/sonor-shell.css">
+<script src="../data/sonor-project-list.js"></script>   <!-- SSOT project-picker ordering (workspace master, synced) -->
+<script src="../data/sonor-wq-client.js"></script>      <!-- read-only WeQuote proxy — the price SSOT -->
+<script src="../data/sonor-sortable.js"></script>
+<script src="../data/takeover-config.js"></script>
+<script src="../data/takeover-app.js"></script>
+<!-- proposal PDF — shared luxury chrome (root master, synced) on pdf-lib -->
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<script src="../data/sonor-pdf-luxury.js"></script>
+<script src="../data/takeover-pdf.js"></script>
+
+<style>
+/* SONOR TAKEOVER — app-local LAYOUT only. NO :root palette, NO raw hex (S-4.1). */
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'DM Sans', system-ui, sans-serif; background: var(--body); color: var(--text-primary); min-height: 100vh; }
+main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
+.tab-pane { display: none; padding-top: 18px; }
+.tab-pane.active { display: block; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row.wrap { flex-wrap: wrap; }
+.spread { justify-content: space-between; }
+.mt { margin-top: 10px; }
+.small { font-size: 12px; }
+.mono { font-family: 'DM Mono', ui-monospace, monospace; font-size: 12px; }
+.muted { color: var(--text-muted); }
+.nav-actions .select { max-width: 360px; }
+.lang-pick { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.lang-pick button { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 10px; border: 0; background: var(--svc-surface); color: var(--text-secondary); cursor: pointer; }
+.lang-pick button.on { background: color-mix(in srgb, var(--svc-accent) 20%, transparent); color: var(--text-primary); }
+.lang-pick button .stale { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); margin-left: 5px; vertical-align: middle; }
+
+/* editor */
+.ed-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+@media (max-width: 1080px) { .ed-grid { grid-template-columns: 1fr; } }
+.fld { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.fld .field-label { margin: 0; }
+.fld textarea.input { min-height: 72px; resize: vertical; line-height: 1.45; }
+.fld textarea.input.lines { min-height: 110px; font-family: inherit; }
+.doc-head { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.doc-head .span2 { grid-column: 1 / -1; }
+.sec-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.sec { border: 1px solid var(--border); border-left: 4px solid var(--svc, var(--border-strong)); border-radius: 8px; background: var(--svc-surface); padding: 12px 14px; }
+.sec-head { display: grid; grid-template-columns: 54px 1fr 150px 110px auto; gap: 8px; align-items: center; }
+.sec-head .n { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.sec-head .input, .sec-head .select { padding: 5px 8px; font-size: 13px; }
+.sec-head .input.title { font-weight: 600; font-size: 14px; }
+.sec-body { display: none; margin-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.sec.collapsed .sec-body { display: none; }
+.sec-body .span2 { grid-column: 1 / -1; }
+.lines-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.lines-tbl th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 4px 6px; border-bottom: 1px solid var(--border); }
+.lines-tbl td { padding: 3px 6px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.lines-tbl .input, .lines-tbl .select { padding: 3px 6px; font-size: 12px; }
+.lines-tbl .num { width: 70px; text-align: right; }
+.lines-tbl .pid { width: 96px; }
+.lines-tbl .chk { text-align: center; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.photo { width: 120px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--bg-3); position: relative; }
+.photo img { width: 100%; height: 84px; object-fit: cover; display: block; }
+.photo .cap { font-size: 10.5px; padding: 4px 6px; }
+.photo.on { outline: 2px solid var(--svc-accent); }
+.side .card + .card { margin-top: 12px; }
+.kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 10px; font-size: 12.5px; }
+.kv .k { color: var(--text-muted); }
+
+/* mirror */
+.mirror-status { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); font-size: 12.5px; }
+.mirror-status.ok { border-color: color-mix(in srgb, var(--green) 60%, transparent); background: color-mix(in srgb, var(--green) 10%, transparent); }
+.mirror-status.amber { border-color: color-mix(in srgb, var(--amber) 60%, transparent); background: color-mix(in srgb, var(--amber) 12%, transparent); }
+.mirror-status.red { border-color: color-mix(in srgb, var(--red) 60%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); }
+.mir-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.mir-tbl th { text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 6px; border-bottom: 1px solid var(--border-strong); }
+.mir-tbl td { padding: 6px; border-bottom: 1px solid var(--border); }
+.mir-tbl tr.grp td { font-weight: 600; padding-top: 12px; border-left: 3px solid var(--svc, var(--border-strong)); padding-left: 8px; }
+.mir-tbl td.r { text-align: right; white-space: nowrap; }
+.mir-tbl tr.issue td { background: color-mix(in srgb, var(--amber) 10%, transparent); }
+.mir-tbl tr.issue-red td { background: color-mix(in srgb, var(--red) 10%, transparent); }
+.tag { display: inline-block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--border-strong); color: var(--text-muted); margin-left: 4px; white-space: nowrap; }
+</style>
+</head>
+<body>
+<header class="header" id="sonor-header"></header>
+<main>
+  <!-- S-4.14 tab bar — positional service-colour underline; actions rail LAST -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="proposal">Proposal</button>
+    <button class="tab-btn" data-tab="mirror">Pricing &amp; mirror <span class="tab-count" id="mirrorCount">–</span></button>
+    <button class="tab-btn" data-tab="settings">Settings</button>
+    <div class="nav-actions">
+      <select class="select" id="projectPick" title="Project"></select>
+      <span class="lang-pick" id="langPick"></span>
+      <span class="pill pill-grey" id="statusPill">—</span>
+      <button class="btn btn-sm" id="newBtn" title="Start a proposal for this project from the takeover template">+ New</button>
+      <button class="btn btn-sm btn-primary" id="saveBtn">Save</button>
+      <button class="btn btn-sm" id="pdfBtn" title="Export the proposal in the language shown">⬇ PDF</button>
+    </div>
+  </div>
+
+  <!-- ══ PROPOSAL (editable sections) ══ -->
+  <section id="tab-proposal" class="tab-pane active">
+    <div id="noProposal" class="card" style="display:none"><div class="card-header"><h2>No proposal yet for this project</h2></div><p class="small" style="padding:0 16px 14px">Press <strong>+ New</strong> to start one from the takeover template (sections in service order, ready to edit), then link the WeQuote quote on the Settings tab.</p></div>
+    <div class="ed-grid" id="editor" style="display:none">
+      <div>
+        <div class="card">
+          <div class="card-header"><h2 id="docH">Document</h2><span class="small muted" id="langNote"></span></div>
+          <div class="doc-head" style="padding:0 16px 14px">
+            <div class="fld span2"><span class="field-label">Title</span><input class="input" id="f_title"></div>
+            <div class="fld span2"><span class="field-label">Subtitle</span><input class="input" id="f_subtitle"></div>
+            <div class="fld span2"><span class="field-label">Summary — one paragraph per line</span><textarea class="input lines" id="f_summary"></textarea></div>
+          </div>
+        </div>
+        <div class="row spread mt"><h2 style="margin:0;font-size:15px">Sections <span class="small muted">— service order, renumbered on export</span></h2><button class="btn btn-sm" id="addSecBtn">+ Section</button></div>
+        <div class="sec-list" id="secList"></div>
+        <div class="card mt">
+          <div class="card-header"><h2>Assumptions &amp; exclusions / Next steps</h2></div>
+          <div class="doc-head" style="padding:0 16px 14px">
+            <div class="fld"><span class="field-label">Assumptions &amp; exclusions — one per line</span><textarea class="input lines" id="f_assumptions"></textarea></div>
+            <div class="fld"><span class="field-label">Next steps — one per line</span><textarea class="input lines" id="f_next"></textarea></div>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <div class="card">
+          <div class="card-header"><h2>Cover</h2></div>
+          <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:8px">
+            <div class="fld"><span class="field-label">Document type (eyebrow)</span><input class="input" id="f_doctype"></div>
+            <div class="fld"><span class="field-label">For the attention of</span><input class="input" id="o_attention"></div>
+            <div class="fld"><span class="field-label">Reference</span><input class="input" id="o_ref"></div>
+            <div class="kv mt"><span class="k">Prepared for</span><span id="k_client">—</span><span class="k">Property</span><span id="k_site">—</span><span class="k">Client language</span><span id="k_lang">—</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Service plan tiers</h2></div>
+          <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:8px">
+            <label class="chk"><input type="checkbox" id="o_tiers_show"> Print the tier comparison (from Service Contracts)</label>
+            <div class="fld"><span class="field-label">Proposed tier</span><select class="select" id="o_tier"></select></div>
+            <p class="small muted" style="margin:0">A takeover does not need a service contract — untick to leave the plans out. The table reads <code>service_contract_tiers</code> live, so it always matches the plans pack.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Internal notes <span class="tag">never printed</span></h2></div>
+          <div style="padding:0 16px 14px"><textarea class="input lines" id="f_internal" placeholder="Subcontractors, costs, who does what — stays in the app"></textarea></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ PRICING & MIRROR ══ -->
+  <section id="tab-mirror" class="tab-pane">
+    <div class="card">
+      <div class="card-header"><h2>WeQuote mirror</h2><div class="row"><span id="mirrorStatus" class="mirror-status">—</span><button class="btn btn-sm" id="mirrorBtn">⟳ Check WeQuote</button></div></div>
+      <p class="small muted" style="padding:0 16px">WeQuote is the price SSOT: every amount in the PDF is a live quote line (qty × sell). The proposal's own lines are only the <em>expected</em> products per section — anything missing, extra or at a different quantity is flagged here. <strong>Amber</strong> = check before sending; <strong>red</strong> = the export is blocked.</p>
+      <div id="mirrorBody" style="padding:0 16px 14px"></div>
+    </div>
+  </section>
+
+  <!-- ══ SETTINGS ══ -->
+  <section id="tab-settings" class="tab-pane">
+    <div class="card">
+      <div class="card-header"><h2>This proposal</h2></div>
+      <div class="doc-head" style="padding:0 16px 14px">
+        <div class="fld"><span class="field-label">Status</span><select class="select" id="o_status"></select></div>
+        <div class="fld"><span class="field-label">Client language</span><select class="select" id="o_lang_client"></select></div>
+        <div class="fld"><span class="field-label">WeQuote quote id</span><input class="input mono" id="o_wq_id" placeholder="e.g. 288457"></div>
+        <div class="fld"><span class="field-label">WeQuote quote no.</span><input class="input mono" id="o_wq_no" placeholder="e.g. 2807"></div>
+      </div>
+      <p class="small muted" style="padding:0 16px 14px">Linking: the project's <code>metadata.wequote_quote_id</code> is picked up automatically when the proposal is created. Prices are never typed here.</p>
+    </div>
+  </section>
+</main>
+<script>
+// VERSION — single source of truth in code (site 1 of 5, S-4.3)
+const APP_VERSION = '0.1.0';
+(function boot() {
+  const _tabs = { proposal: 'Proposal', mirror: 'Pricing & mirror', settings: 'Settings' };
+  const _go = (t) => TakeoverApp.goTab(t);
+  const shell = SonorShell.mount({
+    appKey: 'takeover', appName: 'Takeover', repo: 'sonor-takeover',
+    version: APP_VERSION, faviconHref: '../data/favicon.svg', assetBase: '../data/',
+    supabase: true,
+    requires: ['SonorProjectList', 'SonorWQClient', 'TakeoverApp', 'SonorPdfLuxury', 'TakeoverPdf'],
+    palette: {
+      self: 'takeover',
+      providers: [
+        () => Object.keys(_tabs).map(t => ({ id: 'tab:' + t, label: 'Go to: ' + _tabs[t], hotkey: 'G' + t[0].toUpperCase(), run: () => _go(t) })),
+        () => [
+          { id: 'cmd:save', label: 'Save proposal', hotkey: 'S', run: () => TakeoverApp.save() },
+          { id: 'cmd:pdf', label: 'Export PDF (current language)', hotkey: 'E', run: () => TakeoverApp.exportPdf() },
+          { id: 'cmd:mirror', label: 'Check WeQuote mirror', hotkey: 'M', run: () => TakeoverApp.checkMirror() },
+          { id: 'cmd:wq', label: 'Open WeQuote ↗', run: () => window.open('https://app.wequote.cloud/', '_blank') }
+        ]
+      ],
+      gnav: { p: () => _go('proposal'), m: () => _go('mirror'), s: () => _go('settings') }
+    }
+  });
+  TakeoverApp.boot(shell.ready);
+})();
+</script>
+</body>
+</html>
