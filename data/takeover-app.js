@@ -323,7 +323,7 @@
     var el = $('#mirrorStatus'), body = $('#mirrorBody'), cnt = $('#mirrorCount'); if (!el || !body) return;
     var m = S.mirror;
     if (!m) { el.className = 'mirror-status'; el.textContent = S.cur && S.cur.wq_quote_id ? 'Not checked yet — quote ' + S.cur.wq_quote_id : 'No quote linked'; cnt.textContent = '–'; body.innerHTML = ''; return; }
-    el.className = 'mirror-status ' + m.status; el.textContent = (m.status === 'ok' ? '● Mirrors WeQuote' : m.status === 'amber' ? '● Check before sending' : '● Export blocked') + ' · ' + m.issues.length + ' issue' + (m.issues.length === 1 ? '' : 's') + ' · ' + new Date(m.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    el.className = 'mirror-status ' + m.status; el.textContent = (m.status === 'ok' ? '● Mirrors WeQuote' : m.status === 'amber' ? '● Check before sending' : '● Differences from the quote') + ' · ' + m.issues.length + ' issue' + (m.issues.length === 1 ? '' : 's') + ' · ' + new Date(m.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     cnt.textContent = String(m.issues.length);
     var h = '';
     if (m.issues.length) h += '<ul class="small" style="margin:8px 0 14px;padding-left:18px">' + m.issues.map(function (i) { return '<li style="color:var(--' + (i.level === 'red' ? 'red' : 'amber') + ')">' + esc(i.msg) + '</li>'; }).join('') + '</ul>';
@@ -347,7 +347,7 @@
     if (!S.cur) return;
     if (S.dirty) { await save(); if (S.dirty) return; }
     var m = S.mirror || await checkMirror(); if (!m) return;
-    if (m.status === 'red') { goTab('mirror'); toast('Export blocked — the proposal and the WeQuote quote disagree (red). Fix the quote or the sections first.', 'error'); return; }
+    if (m.status !== 'ok') toast((m.status === 'red' ? 'Lines missing from the quote print as "to be confirmed"' : 'Quote differs from the proposal') + ' — see Pricing & mirror (' + m.issues.length + ')', 'warn');   // never blocked (Bryn 2026-10-16): unpriced = TBC
     if (S.lang !== 'en' && S.cur.options.es_stale && !confirm('The English text changed since this translation was made. Export the ' + S.lang.toUpperCase() + ' version anyway?')) return;
     if (!global.TakeoverPdf) { toast('PDF module missing', 'error'); return; }
     var tier = S.tiers.find(function (t) { return t.key === S.cur.options.tier_proposed; }) || null;

@@ -14,8 +14,8 @@ A takeover does not need a service contract (the tier table is optional) but can
 Laws (never bend):
 - **WeQuote is the price SSOT.** No price is typed here, ever. The PDF's price table is the LIVE quote lines (`list_quote_lines`
   via `sonor-wq-client.js`, source `takeover`); the proposal's own `lines[]` are only the *expected* products per section.
-  Mirror: areas ↔ `section.wq_area` (matched on the leading `N ·` number, then exact name); missing line → **red** (export blocked);
-  qty / optional drift, extra or unmapped lines, DO-IN-WEQUOTE products → **amber** (check before sending).
+  Mirror: quote lines grouped by `structure_id` ↔ `section.wq_structure_id` / the push's `metadata.wequote_quote_structure.areas[key]`; missing line → **red**,
+  qty / optional drift, extra or unmapped lines, DO-IN-WEQUOTE products → **amber**. **The export is never blocked** (Bryn 2026-10-16: "just mark export as TBC if not priced") — an expected line not on the quote, or on it unpriced, prints as *to be confirmed* with the plan quantity.
 - **Service order 01 → 10 everywhere.** Sections sort by `service_nn` (derived order — no handles, no typed numbers); `§nn` is
   renumbered at export. `kind: 'noted'` sections (snags) print with their eyebrow label, no number, no prices.
 - **Client language.** `lang_client` comes from `projects.metadata.client_language`. English is approved first; the client-language

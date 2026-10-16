@@ -121,11 +121,16 @@
     var wq = m.wqLines || [], byArea = {}, keyOf = m.wqLineKey || function (l) { return l.structure_id != null ? 's' + l.structure_id : areaKey(lineArea(l)); };
     wq.forEach(function (l) { var k = keyOf(l); (byArea[k] = byArea[k] || { name: lineArea(l), lines: [] }).lines.push(l); });
     var labels = ((p.line_labels || {})[lang] || {}), labelsEn = ((p.line_labels || {}).en || {});
-    function lineLabel(w, exp) { var k = String(w.product_id); return labels[k] || (exp && exp.wq_name) || labelsEn[k] || w.short_description || w.description || k; }
+    function lineLabel(w, exp) { var k = String(w.product_id != null ? w.product_id : (exp && exp.label_key) || ''); return labels[k] || (exp && (labels[exp.label_key] || exp.wq_name)) || labelsEn[k] || w.short_description || w.description || k; }
     var groups = [], claimed = {};
-    secs.forEach(function (s) { var k = (m.sectionKeys || {})[s.key] || (s.wq_structure_id ? 's' + s.wq_structure_id : (s.wq_area ? areaKey(s.wq_area) : null)); var g = k && byArea[k]; if (!g) return; claimed[k] = true; groups.push({ title: T(s.title), nn: s.service_nn, lines: g.lines, exp: s.lines || [] }); });
+    // every section with expected lines prints: quote lines priced, expected lines not (yet) on the quote as "to be confirmed" (never blocked — Bryn 2026-10-16)
+    secs.forEach(function (s) { var k = (m.sectionKeys || {})[s.key] || (s.wq_structure_id ? 's' + s.wq_structure_id : (s.wq_area ? areaKey(s.wq_area) : null)); var g = k && byArea[k]; var exp = s.lines || []; if (!g && !exp.length) return; if (g) claimed[k] = true;
+      var rows = (g ? g.lines : []).slice(), used = {};
+      rows.forEach(function (w) { var i = exp.findIndex(function (e, j) { return !used[j] && String(e.product_id) === String(w.product_id); }); if (i >= 0) used[i] = true; });
+      exp.forEach(function (e, j) { if (!used[j]) rows.push({ product_id: e.product_id, short_description: e.wq_name, quantity: e.qty, _tbc: true, _exp: e }); });
+      groups.push({ title: T(s.title), nn: s.service_nn, lines: rows, exp: exp }); });
     Object.keys(byArea).forEach(function (k) { if (!claimed[k]) groups.push({ title: (byArea[k].name || '').replace(/^\s*\d+\s*[·.\-–—]\s*/, '') || (lang === 'es' ? 'Otras partidas' : 'Other items'), nn: '10', lines: byArea[k].lines, exp: [] }); });
-    if (wq.length) {
+    if (groups.some(function (g) { return g.lines.length; })) {
       ensure(120); heading(U.prices_h, U.prices_h);
       var cL = M, cQ = M + W * 0.64, cA = A4.w - M, rowH = 15;
       P.tracked(U.price_col.toUpperCase(), cA - F.r.widthOfTextAtSize(U.price_col.toUpperCase(), 6.5) - 6, y, 6.5, F.r, C.LABEL, 1.2); P.tracked(U.qty.toUpperCase(), cQ, y, 6.5, F.r, C.LABEL, 1.2); y += 10; P.hline(M, A4.w - M, y, C.LINE, 0.8); y += 8;
@@ -134,8 +139,8 @@
         ensure(rowH * 2 + 12);
         var hex = lx.hexRgb(svcHex(g.nn)); P.rect(M, y - 1, 3, 9, hex); P.text(g.title, M + 10, y - 2, 9.5, F.b, C.INK); y += rowH;
         g.lines.forEach(function (w) {
-          var exp = g.exp.find(function (e) { return String(e.product_id) === String(w.product_id); }) || null;
-          var q = lineQty(w), tot = lineTotal(w), opt = lineOptional(w), tbc = (q === 0 || tot == null || tot === 0) && !opt;
+          var exp = w._exp || g.exp.find(function (e) { return String(e.product_id) === String(w.product_id); }) || null;
+          var q = lineQty(w), tot = lineTotal(w), opt = lineOptional(w) || !!(exp && exp.optional && w._tbc), tbc = w._tbc || ((q === 0 || tot == null || tot === 0) && !opt);
           var lab = lineLabel(w, exp), tags = []; if (opt) tags.push(U.option); if (exp && exp.provisional) tags.push(U.provisional); if (exp && exp.needs_product) tbc = true;
           var isPlan = /maintenance agreement|service plan|plan de servicio/i.test((w.short_description || '') + ' ' + lab);
           var labW = cQ - M - 16, ls = lx.wrap(lab, F.r, 9, labW); ensure(13 * ls.length + 2);

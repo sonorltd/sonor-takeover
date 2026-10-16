@@ -31,6 +31,7 @@
 <!-- proposal PDF — shared luxury chrome (root master, synced) on pdf-lib -->
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+<script src="../data/sonor-pdf-theme.js"></script>   <!-- 2026-10-16 — ONE PDF theme (black/gold chrome, neutral greys) — load before every PDF pipeline, §41 -->
 <script src="../data/sonor-pdf-luxury.js"></script>
 <script src="../data/takeover-pdf.js"></script>
 
@@ -174,7 +175,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
   <section id="tab-mirror" class="tab-pane">
     <div class="card">
       <div class="card-header"><h2>WeQuote mirror</h2><div class="row"><span id="mirrorStatus" class="mirror-status">—</span><button class="btn btn-sm" id="mirrorBtn">⟳ Check WeQuote</button></div></div>
-      <p class="small muted" style="padding:0 16px">WeQuote is the price SSOT: every amount in the PDF is a live quote line (qty × sell). The proposal's own lines are only the <em>expected</em> products per section — anything missing, extra or at a different quantity is flagged here. <strong>Amber</strong> = check before sending; <strong>red</strong> = the export is blocked.</p>
+      <p class="small muted" style="padding:0 16px">WeQuote is the price SSOT: every amount in the PDF is a live quote line (qty × sell). The proposal's own lines are only the <em>expected</em> products per section — anything missing, extra or at a different quantity is flagged here. <strong>Amber</strong> = check before sending; <strong>red</strong> = expected line not on the quote yet — it prints as <em>to be confirmed</em>. The export is never blocked.</p>
       <div id="mirrorBody" style="padding:0 16px 14px"></div>
     </div>
   </section>
