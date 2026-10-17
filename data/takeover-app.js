@@ -19,6 +19,11 @@
   function $$(s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); }
   function toast(msg, kind) { if (global.SonorShell && global.SonorShell.toast) global.SonorShell.toast(msg, { kind: kind || 'info' }); else console.log('[toast]', msg); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  // 0.1.2 — the ONE WeQuote-linked mark (.wq-pill, data/sonor-components.css · SonorWQClient.pill 1.3.1). App UI only, never the PDF.
+  function wqUrl(kind, id) { var C = global.SonorWQClient; return id ? (C && C.webUrl ? C.webUrl(kind, id) : 'https://app.wequote.cloud/sonor-ltd/' + ({ quote: 'quotes', project: 'projects', customer: 'customers' }[kind] || kind) + '/' + encodeURIComponent(id)) : ''; }
+  function wqPill(o) { o = o || {}; var C = global.SonorWQClient; if (C && C.pill) return C.pill(o); var cls = 'wq-pill' + (o.off ? ' wq-off' : ''), t = o.title ? ' title="' + esc(o.title) + '"' : ''; return o.href ? '<a class="' + cls + '" href="' + esc(o.href) + '" target="_blank" rel="noopener"' + t + '>WQ</a>' : '<span class="' + cls + '"' + t + '>WQ</span>'; }
+  function quotePill(p) { p = p || S.cur; if (!p) return ''; if (!p.wq_quote_id && !p.wq_quote_no) return wqPill({ off: true, title: 'Not linked to a WeQuote quote yet — set it on Settings' }); return wqPill({ title: 'WeQuote quote ' + (p.wq_quote_no ? '#' + p.wq_quote_no : '') + (p.wq_quote_id ? ' (id ' + p.wq_quote_id + ')' : ''), href: wqUrl('quote', p.wq_quote_id) }); }
+  function renderQuoteMarks() { ['#quoteMark', '#mirrorQuoteMark', '#settingsQuoteMark'].forEach(function (sel) { var el = $(sel); if (el) el.innerHTML = S.cur ? quotePill() : ''; }); }
   function svcHex(nn) { var s = (BRAND.services || []).find(function (x) { return x.nn === String(nn); }); return s ? s.hex : null; }
   function svcName(nn) { var s = (BRAND.services || []).find(function (x) { return x.nn === String(nn); }); return s ? s.core : nn; }
   function uid() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16); }); }
@@ -137,9 +142,10 @@
   }
   function renderStatus() {
     var pill = $('#statusPill'); if (!pill) return;
-    if (!S.cur) { pill.className = 'pill pill-grey'; pill.textContent = '—'; return; }
+    if (!S.cur) { pill.className = 'pill pill-grey'; pill.textContent = '—'; renderQuoteMarks(); return; }
     var st = (CFG.statuses || []).find(function (s) { return s.key === S.cur.status; }) || { label: S.cur.status, pill: 'pill-grey' };
     pill.className = 'pill ' + st.pill; pill.textContent = st.label + (S.dirty ? ' · unsaved' : '');
+    renderQuoteMarks();
   }
   function sortedSections() { return (S.cur.sections || []).slice().sort(function (a, b) { return (a.service_nn || '99').localeCompare(b.service_nn || '99') || (a.sort || 0) - (b.sort || 0); }); }
   function renderSections() {
@@ -169,7 +175,7 @@
   }
   function linesTable(s) {
     var rows = (s.lines || []).map(function (l, i) {
-      return '<tr data-i="' + i + '"><td><input class="input pid mono" data-lf="product_id" value="' + esc(l.product_id == null ? '' : l.product_id) + '" placeholder="WQ id"></td>' +
+      return '<tr data-i="' + i + '"><td><input class="input pid mono" data-lf="product_id" value="' + esc(l.product_id == null ? '' : l.product_id) + '" placeholder="WQ id"> ' + (l.product_id != null ? wqPill({ title: 'WeQuote product ' + l.product_id + (l.wq_name ? ' — ' + l.wq_name : '') }) : wqPill({ off: true, title: l.needs_product ? 'No WeQuote product yet (DO-IN-WEQUOTE)' : 'Not linked to a WeQuote product' })) + '</td>' +
         '<td><input class="input" data-lf="wq_name" value="' + esc(l.wq_name || '') + '" placeholder="WeQuote product name"></td>' +
         '<td><input class="input" data-lf="label" value="' + esc(((S.cur.line_labels || {})[S.lang] || {})[String(l.product_id == null ? (l.label_key || '') : l.product_id)] || '') + '" placeholder="Client label (' + S.lang + ')"></td>' +
         '<td><input class="input num" data-lf="qty" type="number" step="0.5" value="' + esc(l.qty == null ? '' : l.qty) + '"></td>' +
@@ -356,7 +362,7 @@
       h += '<tr class="grp"' + (hex ? ' style="--svc:' + hex + '"' : '') + '><td colspan="7">' + (g.section ? esc(L(g.section.title)) : '<em>unmapped</em>') + ' <span class="tag">' + esc(g.wq ? g.wq.name : (g.section && g.section.wq_area ? g.section.wq_area + ' · not on quote' : 'no area')) + '</span></td></tr>';
       g.rows.forEach(function (r) {
         var w = r.wq, cls = r.state === 'ok' ? '' : (r.state === 'missing' ? 'issue-red' : 'issue');
-        h += '<tr class="' + cls + '"><td></td><td>' + esc(r.exp ? r.exp.wq_name : (w.short_description || w.description || '')) + (w && w.product_id ? ' <span class="mono muted">' + esc(w.product_id) + '</span>' : '') + (w && lineOptional(w) ? '<span class="tag">option</span>' : '') + (r.exp && r.exp.provisional ? '<span class="tag">prov.</span>' : '') + '</td>' +
+        h += '<tr class="' + cls + '"><td></td><td>' + esc(r.exp ? r.exp.wq_name : (w.short_description || w.description || '')) + (w ? ' ' + wqPill({ title: 'On WeQuote quote' + (S.cur && S.cur.wq_quote_no ? ' #' + S.cur.wq_quote_no : '') + (w.product_id ? ' · product ' + w.product_id : ''), href: wqUrl('quote', S.cur && S.cur.wq_quote_id) }) : (r.exp ? ' ' + wqPill({ off: true, title: r.exp.product_id ? 'Expected product ' + r.exp.product_id + ' is not on the quote' : 'No WeQuote product yet' }) : '')) + (w && w.product_id ? ' <span class="mono muted">' + esc(w.product_id) + '</span>' : '') + (w && lineOptional(w) ? '<span class="tag">option</span>' : '') + (r.exp && r.exp.provisional ? '<span class="tag">prov.</span>' : '') + '</td>' +
           '<td class="r">' + (r.exp ? esc(r.exp.qty) + (r.exp.unit ? ' ' + r.exp.unit : '') : '—') + '</td><td class="r">' + (w ? esc(lineQty(w)) : '—') + '</td><td class="r">' + (w ? gbp(w.sell_price != null ? w.sell_price : w.unit_price) : '—') + '</td><td class="r">' + (w ? gbp(lineTotal(w)) : '—') + '</td><td>' + esc(r.state) + '</td></tr>';
       });
     });
