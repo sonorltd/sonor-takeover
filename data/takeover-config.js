@@ -5,7 +5,8 @@
    (`takeover_proposals`), prices in WeQuote, tiers in `service_contract_tiers`, photos in `survey_pages`.
 */
 window.__TAKEOVER_CONFIG__ = {
-  version: '0.1.0',   // 2026-10-16 born: editable sections, WQ mirror, luxury PDF (B-553)
+  version: '0.1.1',   // 2026-10-17 shared project bar 1.14.0 replaces the own picker
+  // 0.1.0 — 2026-10-16 born: editable sections, WQ mirror, luxury PDF (B-553)
   table: 'takeover_proposals',
   languages: [{ key: 'en', label: 'English' }, { key: 'es', label: 'Español' }],
   statuses: [
