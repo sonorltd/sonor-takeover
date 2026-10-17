@@ -1,4 +1,7 @@
-/* Sonor Takeover — app logic  v0.1.0 (2026-10-16)
+/* Sonor Takeover — app logic  v0.1.1 (2026-10-17: the shared project bar 1.14.0 is the picker — ● has-a-proposal via
+   decorateOption, unsaved-edits guard via beforeChange, the bar's + New hidden; #project= hash, ?pid= and the old
+   sonor_takeover_project memory still open a project)
+   v0.1.0 (2026-10-16)
    The takeover survey / proposal (B-553): one editable proposal per project in `takeover_proposals`, in the client's language,
    mirrored to the WeQuote quote that carries every price. Laws (CLAUDE.md): prices are NEVER typed here — WeQuote is the SSOT;
    sections print in service order 01 → 10 (derived from service_nn, no handles); EN is approved first, the client language is
@@ -62,23 +65,43 @@
     r.forEach(function (x) { if (x.error) toast(x.error.message, 'error'); });
     S.projects = r[0].data || []; S.proposals = r[1].data || []; S.tiers = (r[2].data || []).filter(function (t) { return (t.metadata || {}).segment == null || (t.metadata || {}).segment === 'residential'; });
     S.tierAspects = {}; (r[3].data || []).forEach(function (a) { (S.tierAspects[a.tier_key] = S.tierAspects[a.tier_key] || {})[a.aspect_key] = a; });
-    fillProjectPick();
-    var want = (location.hash.match(/project=([0-9a-f-]{36})/) || [])[1] || (function () { try { return localStorage.getItem(LS_PROJECT); } catch (e) { return null; } })();
-    var has = S.projects.find(function (p) { return p.id === want; }) || S.projects.find(function (p) { return S.proposals.some(function (q) { return q.project_id === p.id; }); }) || S.projects[0];
+    var want = (location.hash.match(/project=([0-9a-f-]{36})/) || [])[1];
+    var PB = global.SonorProjectBar;
+    if (PB && PB.init) {
+      try {
+        await PB.init({
+          supa: c, appKey: 'takeover', host: $('#projectBarHost'), showNew: false,   // + New in the tab bar starts a PROPOSAL, not a project
+          decorateOption: function (p) { return hasProposal(p.id) ? { prefix: '● ', title: 'Has a takeover proposal' } : ''; },
+          beforeChange: function (newId, prevId, ctx) {
+            var dirty = S.dirty && S.cur && S.cur.project_id !== newId;
+            if (!dirty) return true;
+            if (ctx && ctx.fromOtherTab) { toast('Another Takeover tab switched project — this tab keeps your unsaved proposal', 'warn'); return false; }
+            return confirm('Discard unsaved changes to the current proposal?');
+          },
+          onChange: function (d) {
+            var id = d && d.currentId || null;
+            if (S.project && S.project.id === id) return;
+            selectProject(id);
+          }
+        });
+      } catch (e) { console.warn('[takeover] project bar', e); }
+      if (!want && PB.getActiveId) want = PB.getActiveId();   // ?pid= deep link or this app's own memory
+    }
+    if (!want) want = (function () { try { return localStorage.getItem(LS_PROJECT); } catch (e) { return null; } })();   // pre-0.1.1 memory
+    var has = S.projects.find(function (p) { return p.id === want; }) || S.projects.find(function (p) { return hasProposal(p.id); }) || S.projects[0];
     selectProject(has ? has.id : null);
   }
-  function fillProjectPick() {
-    var sel = $('#projectPick'); if (!sel) return;
-    if (global.SonorProjectList) global.SonorProjectList.populateSelect(sel, S.projects, { currentId: S.project ? S.project.id : '' });
-    else sel.innerHTML = S.projects.map(function (p) { return '<option value="' + p.id + '">' + esc((p.ref ? p.ref + ' — ' : '') + (p.name || '')) + '</option>'; }).join('');
-    // mark which projects already carry a proposal
-    $$('option', sel).forEach(function (o) { if (S.proposals.some(function (q) { return q.project_id === o.value; })) o.textContent = '● ' + o.textContent.replace(/^● /, ''); });
+  function hasProposal(id) { return S.proposals.some(function (q) { return q.project_id === id; }); }
+  // the shared bar is the picker (v0.1.1); keep it showing the selected project + fresh ● marks
+  function syncBar(id) {
+    var PB = global.SonorProjectBar; if (!PB || !PB.getActiveId) return;
+    if (id && PB.getActiveId() !== id) PB.setActive(id);   // onChange → selectProject returns early (same id)
+    else if (PB.rerender) PB.rerender();
   }
   function selectProject(id) {
-    if (S.dirty && S.cur && S.cur.project_id !== id && !confirm('Discard unsaved changes to the current proposal?')) { $('#projectPick').value = S.cur.project_id; return; }
     S.project = S.projects.find(function (p) { return p.id === id; }) || null; S.mirror = null; S.wq = { lines: null, at: null, quoteId: null }; S.dirty = false;
     S.cur = S.project ? (S.proposals.find(function (q) { return q.project_id === id && q.status !== 'superseded'; }) || S.proposals.find(function (q) { return q.project_id === id; }) || null) : null;
-    if ($('#projectPick')) $('#projectPick').value = id || '';
+    syncBar(id);
     try { if (id) localStorage.setItem(LS_PROJECT, id); } catch (e) {}
     if (S.cur && S.cur.lang_client && S.cur.lang_client !== 'en' && S.lang !== 'en' && S.lang !== S.cur.lang_client) S.lang = 'en';
     render();
@@ -220,7 +243,6 @@
   // ── doc-level fields ──
   function wireGlobal() {
     $$('.tab-btn').forEach(function (b) { b.onclick = function () { goTab(b.dataset.tab); }; });
-    $('#projectPick').onchange = function () { selectProject(this.value); };
     $('#newBtn').onclick = function () { if (!S.project) return; if (S.cur && !confirm('This project already has a proposal. Start another from the template? (the current one stays; mark it Superseded on Settings)')) return; S.cur = newFromTemplate(S.project); S.proposals.unshift(S.cur); S.dirty = true; S.lang = 'en'; render(); toast('New proposal from the takeover template — edit, then Save'); };
     $('#saveBtn').onclick = function () { save(); };
     $('#pdfBtn').onclick = function () { exportPdf(); };
@@ -254,7 +276,7 @@
     row.mirror = S.mirror ? { status: S.mirror.status, checked_at: S.mirror.at, wq_quote_id: S.mirror.quoteId, issues: S.mirror.issues.length, totals: S.mirror.totals } : (row.mirror || {});
     var r = await S.db.client.from(CFG.table || 'takeover_proposals').upsert(row, { onConflict: 'id' }).select().single();
     if (r.error) { toast('Save failed: ' + r.error.message, 'error'); return; }
-    Object.assign(S.cur, r.data); S.dirty = false; renderStatus(); fillProjectPick(); $('#projectPick').value = S.cur.project_id;
+    Object.assign(S.cur, r.data); S.dirty = false; renderStatus(); syncBar(S.cur.project_id);
     try {
       var patch = { takeover_proposal: { id: S.cur.id, status: S.cur.status, lang_client: S.cur.lang_client, wq_quote_id: S.cur.wq_quote_id, wq_quote_no: S.cur.wq_quote_no, updated_at: new Date().toISOString(), app: 'takeover' } };
       var rm = await S.db.client.rpc('sonor_merge_project_metadata', { p_project_id: S.cur.project_id, p_patch: patch });

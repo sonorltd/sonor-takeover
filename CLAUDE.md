@@ -1,4 +1,6 @@
-# Takeover — Claude Code Context (v0.1.0)
+# Takeover — Claude Code Context (v0.1.1)
+
+> **v0.1.1 (2026-10-17)** — the shared project bar (root `sonor-project-bar.js` 1.14.0 + bus + list, synced into `data/`) replaces the app's own `#projectPick`: appKey `takeover`, `decorateOption` marks ● projects that have a proposal, `beforeChange` is the unsaved-edits guard, `showNew:false` (the tab bar's + New starts a proposal). `#project=<uuid>`, `?pid=` and the pre-0.1.1 `sonor_takeover_project` memory all still open a project.
 
 > **Spine version: 1.3** (SONOR-APP-SPINE.md) — SonorShell app (§21)
 > Inherits: `../CLAUDE.md` (master brand rules + cross-project references)
@@ -28,7 +30,7 @@ Laws (never bend):
 
 ## Architecture
 Spine 1.3 SonorShell app, vanilla, graphite. Files:
-- `dashboard/sonor-takeover.html` — head/import order cloned from Service Contracts; `SonorShell.mount({appKey:'takeover', requires:[SonorProjectList, SonorWQClient, TakeoverApp, SonorPdfLuxury, TakeoverPdf]})`; tabs Proposal / Pricing & mirror / Settings; nav-actions = project picker (`SonorProjectList.populateSelect`, ● = has a proposal), EN/ES toggle, status pill, + New, Save, ⬇ PDF. Palette: G-P / G-M / G-S, S, E, M.
+- `dashboard/sonor-takeover.html` — head/import order cloned from Service Contracts; `SonorShell.mount({appKey:'takeover', requires:[SonorProjectList, SonorWQClient, TakeoverApp, SonorPdfLuxury, TakeoverPdf]})`; tabs Proposal / Pricing & mirror / Settings; shared project bar above the tabs (`SonorProjectBar`, appKey `takeover`, ● = has a proposal); nav-actions = EN/ES toggle, status pill, + New, Save, ⬇ PDF. Palette: G-P / G-M / G-S, S, E, M.
 - `data/takeover-config.js` — `window.__TAKEOVER_CONFIG__`: version, table, languages, statuses, serviceOrder, `template[]` (8 workstreams: lutron 04, control4 07, handover 07, service 07, security 08, network 09, logistics 10, snags 10/noted), `ui.{en,es}` PDF strings (incl. tier rows/values, rear-page labels, units), `months_es`, storage bucket, assets.
 - `data/takeover-app.js` (`TakeoverApp`) — load projects + proposals + `service_contract_tiers` (+ `_tier_aspects` for annual price overrides); new-from-template (picks up `metadata.wequote_quote_id`, `wequote_quotes[0].quote_no`, `client_language`); section editor (title / service / kind / do[] / result / wq_area / label / lines table / photos); photos picked from storage `site-photos/<project_id>/survey/**` (no survey-schema coupling); save = upsert row + `sonor_merge_project_metadata` pointer `metadata.takeover_proposal` (the RPC is SHALLOW on top-level keys — the pointer is its own key); mirror (`computeMirror`) + export gate.
 - `data/takeover-pdf.js` (`TakeoverPdf.generate`) — cover → summary → sections (service colour bar, bullets, outcome, photos two-across) → price table grouped by section from live WQ lines (`line_labels[lang][product_id]` → client label; qty from WQ; `to be confirmed` when 0 / no price / DO-IN-WEQUOTE; subtotals works / plan) → optional tier table (14 rows, proposed tier shaded) → assumptions → next steps → validity → rear page. Download name `Proposal-Sonor_<ref>_<LANG>.pdf` / `Propuesta-…`.

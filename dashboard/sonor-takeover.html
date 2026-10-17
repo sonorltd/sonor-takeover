@@ -24,6 +24,8 @@
 <script src="../data/sonor-shell.js"></script>
 <link rel="stylesheet" href="../data/sonor-shell.css">
 <script src="../data/sonor-project-list.js"></script>   <!-- SSOT project-picker ordering (workspace master, synced) -->
+<script src="../data/sonor-project-bus.js"></script>    <!-- active-project broadcast — BEFORE the bar (synced) -->
+<script src="../data/sonor-project-bar.js"></script>    <!-- shared project bar 1.14.0 (synced) — appKey 'takeover' -->
 <script src="../data/sonor-wq-client.js"></script>      <!-- read-only WeQuote proxy — the price SSOT -->
 <script src="../data/sonor-sortable.js"></script>
 <script src="../data/takeover-config.js"></script>
@@ -106,6 +108,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
 </head>
 <body>
 <header class="header" id="sonor-header"></header>
+<div id="projectBarHost"></div>
 <main>
   <!-- S-4.14 tab bar — positional service-colour underline; actions rail LAST -->
   <div class="tab-bar">
@@ -113,7 +116,6 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
     <button class="tab-btn" data-tab="mirror">Pricing &amp; mirror <span class="tab-count" id="mirrorCount">–</span></button>
     <button class="tab-btn" data-tab="settings">Settings</button>
     <div class="nav-actions">
-      <select class="select" id="projectPick" title="Project"></select>
       <span class="lang-pick" id="langPick"></span>
       <span class="pill pill-grey" id="statusPill">—</span>
       <button class="btn btn-sm" id="newBtn" title="Start a proposal for this project from the takeover template">+ New</button>
@@ -196,7 +198,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
 </main>
 <script>
 // VERSION — single source of truth in code (site 1 of 5, S-4.3)
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.1.1';
 (function boot() {
   const _tabs = { proposal: 'Proposal', mirror: 'Pricing & mirror', settings: 'Settings' };
   const _go = (t) => TakeoverApp.goTab(t);
@@ -204,7 +206,7 @@ const APP_VERSION = '0.1.0';
     appKey: 'takeover', appName: 'Takeover', repo: 'sonor-takeover',
     version: APP_VERSION, faviconHref: '../data/favicon.svg', assetBase: '../data/',
     supabase: true,
-    requires: ['SonorProjectList', 'SonorWQClient', 'TakeoverApp', 'SonorPdfLuxury', 'TakeoverPdf'],
+    requires: ['SonorProjectList', 'SonorProjectBar', 'SonorWQClient', 'TakeoverApp', 'SonorPdfLuxury', 'TakeoverPdf'],
     palette: {
       self: 'takeover',
       providers: [
