@@ -35,6 +35,8 @@
 //                  unsaved-changes guards; a third arg { fromOtherTab } is true when another tab of the same app
 //                  switched, and false there means "don't follow"); `showNew: false` hides the bar's + New (apps with their own New modal).
 //                  Apps that pass none of them behave exactly as 1.13.0.
+// Version: 1.13.0 — picker re-fetches on open (2026-10-16): opening the dropdown reloads the list when it is older than
+//                  20 s, so ⏱ Recently edited stays accurate after another app / session saves. Bryn: "the recents isnt accurate".
 // Version: 1.12.0 — OFFLINE project list (2026-10-13): the loaded list is mirrored to localStorage `sonor_projects_cache`
 //                  (slim rows, ~1 KB each) and used when Supabase can't be reached, so a field app refreshed with no
 //                  signal still has its picker / finder / project name. Bryn: "will all this work offline on the ipad".
