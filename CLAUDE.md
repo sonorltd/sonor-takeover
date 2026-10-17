@@ -1,4 +1,8 @@
-# Takeover — Claude Code Context (v0.1.2)
+# Takeover — Claude Code Context (v0.1.3)
+
+> **v0.1.3 (2026-10-17)** — consistency batch: supabase-js pinned to 2.45.4 + SRI, shared masters synced (project-bar / kit mirror / wq-sync / takeoffs-supabase / wq-push to their masters). No feature change.
+
+> **v0.1.2 (2026-10-17)** — WeQuote-linked mark (Bryn: "a small wq … pill bubble against items that are wq linked"): the shared `.wq-pill` (small red WQ, `data/sonor-components.css`, `SonorWQClient.pill()` / `webUrl()` 1.3.1, both re-synced from the root masters) beside the status pill in the tab bar, in the Pricing & mirror header and on the Settings quote-id label (links to the WeQuote quote; outline `.wq-off` when no quote is linked), on every section line with a WeQuote product (outline when it has none), and on mirror rows that are on the live quote (outline for expected lines missing from it). App UI only — never in the client PDF.
 
 > **v0.1.1 (2026-10-17)** — the shared project bar (root `sonor-project-bar.js` 1.14.0 + bus + list, synced into `data/`) replaces the app's own `#projectPick`: appKey `takeover`, `decorateOption` marks ● projects that have a proposal, `beforeChange` is the unsaved-edits guard, `showNew:false` (the tab bar's + New starts a proposal). `#project=<uuid>`, `?pid=` and the pre-0.1.1 `sonor_takeover_project` memory all still open a project.
 
