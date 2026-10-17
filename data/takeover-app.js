@@ -72,11 +72,15 @@
         await PB.init({
           supa: c, appKey: 'takeover', host: $('#projectBarHost'), showNew: false,   // + New in the tab bar starts a PROPOSAL, not a project
           decorateOption: function (p) { return hasProposal(p.id) ? { prefix: '● ', title: 'Has a takeover proposal' } : ''; },
-          beforeChange: function (newId) { return !(S.dirty && S.cur && S.cur.project_id !== newId) || confirm('Discard unsaved changes to the current proposal?'); },
+          beforeChange: function (newId, prevId, ctx) {
+            var dirty = S.dirty && S.cur && S.cur.project_id !== newId;
+            if (!dirty) return true;
+            if (ctx && ctx.fromOtherTab) { toast('Another Takeover tab switched project — this tab keeps your unsaved proposal', 'warn'); return false; }
+            return confirm('Discard unsaved changes to the current proposal?');
+          },
           onChange: function (d) {
             var id = d && d.currentId || null;
             if (S.project && S.project.id === id) return;
-            if (d && d.fromOtherTab && S.dirty) { toast('Another Takeover tab switched project — this tab keeps your unsaved proposal', 'warn'); return; }
             selectProject(id);
           }
         });

@@ -32,7 +32,8 @@
 //                  `decorateOption(p)` → string suffix or {prefix, suffix, title} per picker option (also applied
 //                  after SonorProjectList builds the grouped options); `beforeChange(newId, prevId)` → return false
 //                  or Promise<false> to veto a switch from the picker (selection restored, no bus / LS write — for
-//                  unsaved-changes guards); `showNew: false` hides the bar's + New (apps with their own New modal).
+//                  unsaved-changes guards; a third arg { fromOtherTab } is true when another tab of the same app
+//                  switched, and false there means "don't follow"); `showNew: false` hides the bar's + New (apps with their own New modal).
 //                  Apps that pass none of them behave exactly as 1.13.0.
 // Version: 1.12.0 — OFFLINE project list (2026-10-13): the loaded list is mirrored to localStorage `sonor_projects_cache`
 //                  (slim rows, ~1 KB each) and used when Supabase can't be reached, so a field app refreshed with no
@@ -386,7 +387,7 @@
           const prevId = _activeId;
           const restore = () => { try { sel.value = prevId || ''; } catch (_) {} };
           let r;
-          try { r = _beforeChange(newId, prevId); } catch (err) { console.warn('[ProjectBar] beforeChange threw:', err); r = true; }
+          try { r = _beforeChange(newId, prevId, { fromOtherTab: false }); } catch (err) { console.warn('[ProjectBar] beforeChange threw:', err); r = true; }
           if (r && typeof r.then === 'function') {
             restore();   // hold the old selection while the app decides
             r.then(ok => { if (ok === false) { restore(); return; } if (_activeId === prevId) _setActiveProject(newId); },
@@ -467,16 +468,27 @@
         if (e.key !== _lsKeyFor()) return;
         const newId = e.newValue || null;
         if (newId === _activeId) return;
-        _activeId = newId;
-        _render();
-        const project = _projects.find(p => p && p.id === newId) || null;
-        const detail = { previousId: null, currentId: newId, project, fromOtherTab: true, via: 'storage-event' };
-        document.dispatchEvent(new CustomEvent('sonor:project-changed', { detail }));
-        if (typeof _onChange === 'function') {
-          try { _onChange(detail); } catch (e2) { /* ignore */ }
+        // v1.14.0 — the app may decline to follow another of its own tabs (third arg { fromOtherTab: true }); a declined
+        // follow changes nothing here and writes nothing (no tab ping-pong). Promise answers are honoured the same way.
+        if (typeof _beforeChange === 'function') {
+          let r;
+          try { r = _beforeChange(newId, _activeId, { fromOtherTab: true }); } catch (err) { r = true; }
+          if (r === false) return;
+          if (r && typeof r.then === 'function') { r.then(ok => { if (ok !== false && _activeId !== newId) _followOtherTab(newId); }, () => {}); return; }
         }
+        _followOtherTab(newId);
       });
       return;
+    }
+    function _followOtherTab(newId) {   // hoisted — used by the per-app storage listener above
+      _activeId = newId;
+      _render();
+      const project = _projects.find(p => p && p.id === newId) || null;
+      const detail = { previousId: null, currentId: newId, project, fromOtherTab: true, via: 'storage-event' };
+      document.dispatchEvent(new CustomEvent('sonor:project-changed', { detail }));
+      if (typeof _onChange === 'function') {
+        try { _onChange(detail); } catch (e2) { /* ignore */ }
+      }
     }
     if (bus && typeof bus.subscribe === 'function') {
       bus.subscribe((detail) => {
