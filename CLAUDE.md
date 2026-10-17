@@ -1,4 +1,4 @@
-# Takeover — Claude Code Context (v0.1.1)
+# Takeover — Claude Code Context (v0.1.2)
 
 > **v0.1.1 (2026-10-17)** — the shared project bar (root `sonor-project-bar.js` 1.14.0 + bus + list, synced into `data/`) replaces the app's own `#projectPick`: appKey `takeover`, `decorateOption` marks ● projects that have a proposal, `beforeChange` is the unsaved-edits guard, `showNew:false` (the tab bar's + New starts a proposal). `#project=<uuid>`, `?pid=` and the pre-0.1.1 `sonor_takeover_project` memory all still open a project.
 
