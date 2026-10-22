@@ -102,7 +102,8 @@
       ensure(Math.min(hTitle + hDo + hRes + 16, 260));
       var top = y, startP = P;
       P.tracked(isNoted ? String(T(s.label) || U.noted).toUpperCase() : ('§' + String(n).padStart(2, '0')), M + 14, y + 1, 7, F.r, hex, 2.2);
-      P.text(T(s.title), M + 14 + (isNoted ? 44 : 30), y - 2, 12.5, F.b, C.INK);
+      var lblW = isNoted ? F.r.widthOfTextAtSize(String(T(s.label) || U.noted).toUpperCase(), 7) + (String(T(s.label) || U.noted).length * 2.2) + 12 : 30;   // noted label can be long (OBSERVADO)
+      P.text(T(s.title), M + 14 + lblW, y - 2, 12.5, F.b, C.INK);
       if (!isNoted && sectionAllOptional(s)) {   // the whole section is an option: a gold pill after the title, unmissable
         var tw0 = F.b.widthOfTextAtSize(T(s.title), 12.5), lab0 = String(U.option_note || U.option).toUpperCase(), lw0 = F.b.widthOfTextAtSize(lab0, 6.5) + lab0.length * 1.4 + 14;
         var px0 = M + 14 + 30 + tw0 + 10, py0 = y - 3;
@@ -111,7 +112,8 @@
       }
       y += hTitle;
       if (dos.length) { P.tracked(U.what_we_do.toUpperCase(), M + 14, y, 6.5, F.r, C.LABEL, 2); y += 11; bullets(dos, 9.5, W - 18, M + 18); }
-      if (res) { ensure(hRes); P.tracked(U.result.toUpperCase(), M + 14, y, 6.5, F.r, C.LABEL, 2); y += 11; para(res, 9.5, F.l, C.INK, W - 32, M + 18, 13.5); }
+      var kPre = (m.sectionKeys || {})[s.key] || (s.wq_structure_id ? 's' + s.wq_structure_id : null), nOpt = (!isNoted && !sectionAllOptional(s)) ? (kPre ? wqAll.filter(function (l) { return keyOf0(l) === kPre && l.product_id && optOf(l) && !(l.is_bundle_item === 1 || l.is_bundle_item === '1'); }).length : (s.lines || []).filter(function (e) { return e.optional; }).length) : 0;
+      if (res) { ensure(hRes + (nOpt ? 18 + 13.5 * nOpt : 0)); P.tracked(U.result.toUpperCase(), M + 14, y, 6.5, F.r, C.LABEL, 2); y += 11; para(res, 9.5, F.l, C.INK, W - 32, M + 18, 13.5); }
       // mixed section: name the optional items (from the quote's inactive lines, with the client labels) so an option is never buried in the bullets
       if (!isNoted && !sectionAllOptional(s)) {
         var k1 = (m.sectionKeys || {})[s.key] || (s.wq_structure_id ? 's' + s.wq_structure_id : null), labs1 = ((p.line_labels || {})[lang] || {}), labsEn1 = ((p.line_labels || {}).en || {});
