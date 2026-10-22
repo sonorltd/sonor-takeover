@@ -103,10 +103,24 @@
       var top = y, startP = P;
       P.tracked(isNoted ? String(T(s.label) || U.noted).toUpperCase() : ('§' + String(n).padStart(2, '0')), M + 14, y + 1, 7, F.r, hex, 2.2);
       P.text(T(s.title), M + 14 + (isNoted ? 44 : 30), y - 2, 12.5, F.b, C.INK);
-      if (!isNoted && sectionAllOptional(s)) { var tw0 = F.b.widthOfTextAtSize(T(s.title), 12.5); P.tracked(String(U.option).toUpperCase(), M + 14 + 30 + tw0 + 8, y + 2, 6.5, F.r, C.GOLD, 1.8); }
+      if (!isNoted && sectionAllOptional(s)) {   // the whole section is an option: a gold pill after the title, unmissable
+        var tw0 = F.b.widthOfTextAtSize(T(s.title), 12.5), lab0 = String(U.option_note || U.option).toUpperCase(), lw0 = F.b.widthOfTextAtSize(lab0, 6.5) + lab0.length * 1.4 + 14;
+        var px0 = M + 14 + 30 + tw0 + 10, py0 = y - 3;
+        if (px0 + lw0 > A4.w - M) { y += hTitle; px0 = M + 14 + 30; py0 = y - 6; hTitle = 16; }   // long title: the pill drops to its own line
+        P.rrect(px0, py0, lw0, 13, 2, C.GOLD, 0.8, 0.9); P.tracked(lab0, px0 + 7, py0 + 4, 6.5, F.b, C.GOLD, 1.4);
+      }
       y += hTitle;
       if (dos.length) { P.tracked(U.what_we_do.toUpperCase(), M + 14, y, 6.5, F.r, C.LABEL, 2); y += 11; bullets(dos, 9.5, W - 18, M + 18); }
       if (res) { ensure(hRes); P.tracked(U.result.toUpperCase(), M + 14, y, 6.5, F.r, C.LABEL, 2); y += 11; para(res, 9.5, F.l, C.INK, W - 32, M + 18, 13.5); }
+      // mixed section: name the optional items (from the quote's inactive lines, with the client labels) so an option is never buried in the bullets
+      if (!isNoted && !sectionAllOptional(s)) {
+        var k1 = (m.sectionKeys || {})[s.key] || (s.wq_structure_id ? 's' + s.wq_structure_id : null), labs1 = ((p.line_labels || {})[lang] || {}), labsEn1 = ((p.line_labels || {}).en || {});
+        var opts1 = k1 ? wqAll.filter(function (l) { return keyOf0(l) === k1 && l.product_id && optOf(l) && !(l.is_bundle_item === 1 || l.is_bundle_item === '1'); }) : (s.lines || []).filter(function (e) { return e.optional; });
+        if (opts1.length) {
+          ensure(14 + 13.5 * opts1.length); y += 4; P.tracked(String(U.option_items || U.option).toUpperCase(), M + 14, y, 6.5, F.b, C.GOLD, 2); y += 11;
+          opts1.forEach(function (l) { var e = (s.lines || []).find(function (x) { return String(x.product_id) === String(l.product_id); }); var k2 = String(l.product_id); var txt = labs1[k2] || labsEn1[k2] || (e && e.wq_name) || l.short_description || k2; var q = l.quantity != null ? l.quantity : (e && e.qty); P.text('–', M + 18, y, 9.5, F.r, C.GOLD); P.text(txt + (q && Number(q) !== 1 ? '  ·  ' + fmtQty(q, e ? e.unit : '', UN) : ''), M + 32, y, 9.5, F.r, C.INK2); y += 13.5; });
+        }
+      }
       // service colour bar — drawn after measuring on the page the block ended on (blocks that spilled keep the bar on the first page only)
       if (P === startP && top < y) P.rect(M, top - 4, 3, Math.min(y, BOTTOM) - top + 2, hex); else startP.rect(M, top - 4, 3, BOTTOM - top, hex);
       // photos — two across
