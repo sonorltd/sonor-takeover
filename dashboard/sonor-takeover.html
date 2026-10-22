@@ -139,7 +139,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
             <div class="fld span2"><span class="field-label">Summary — one paragraph per line</span><textarea class="input lines" id="f_summary"></textarea></div>
           </div>
         </div>
-        <div class="row spread mt"><h2 style="margin:0;font-size:15px">Sections <span class="small muted">— service order, renumbered on export</span></h2><button class="btn btn-sm" id="addSecBtn">+ Section</button></div>
+        <div class="row spread mt"><h2 style="margin:0;font-size:15px">Sections <span class="small muted">— in WeQuote area order (check the mirror to refresh it), renumbered on export</span></h2><button class="btn btn-sm" id="addSecBtn">+ Section</button></div>
         <div class="sec-list" id="secList"></div>
         <div class="card mt">
           <div class="card-header"><h2>Assumptions &amp; exclusions / Next steps</h2></div>
@@ -178,7 +178,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
   <!-- ══ PRICING & MIRROR ══ -->
   <section id="tab-mirror" class="tab-pane">
     <div class="card">
-      <div class="card-header"><h2>WeQuote mirror</h2><div class="row"><span id="mirrorQuoteMark" class="wq-mark"></span><span id="mirrorStatus" class="mirror-status">—</span><button class="btn btn-sm" id="mirrorBtn">⟳ Check WeQuote</button></div></div>
+      <div class="card-header"><h2>WeQuote mirror</h2><div class="row"><span id="mirrorQuoteMark" class="wq-mark"></span><span id="mirrorStatus" class="mirror-status">—</span><button class="btn btn-sm" id="mirrorBtn">⟳ Check WeQuote</button><button class="btn btn-sm" id="refreshLinesBtn" title="Rebuild every mapped section's expected lines from the quote (qty + optional from WeQuote; labels and notes kept)">⟲ Refresh lines from WeQuote</button></div></div>
       <p class="small muted" style="padding:0 16px">WeQuote is the price SSOT: every amount in the PDF is a live quote line (qty × sell). The proposal's own lines are only the <em>expected</em> products per section — anything missing, extra or at a different quantity is flagged here. <strong>Amber</strong> = check before sending; <strong>red</strong> = expected line not on the quote yet — it prints as <em>to be confirmed</em>. The export is never blocked.</p>
       <div id="mirrorBody" style="padding:0 16px 14px"></div>
     </div>
@@ -193,6 +193,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
         <div class="fld"><span class="field-label">Client language</span><select class="select" id="o_lang_client"></select></div>
         <div class="fld"><span class="field-label">WeQuote quote id <span id="settingsQuoteMark" class="wq-mark"></span></span><input class="input mono" id="o_wq_id" placeholder="e.g. 288457"></div>
         <div class="fld"><span class="field-label">WeQuote quote no.</span><input class="input mono" id="o_wq_no" placeholder="e.g. 2807"></div>
+        <div class="fld"><span class="field-label">Prices in the PDF</span><select class="select" id="o_prices"><option value="reference">Reference only — "see the Sonor quotation"</option><option value="table">Price table from the live quote</option></select></div>
       </div>
       <p class="small muted" style="padding:0 16px 14px">Linking: the project's <code>metadata.wequote_quote_id</code> is picked up automatically when the proposal is created. Prices are never typed here.</p>
     </div>
@@ -200,7 +201,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 0 22px 60px; }
 </main>
 <script>
 // VERSION — single source of truth in code (site 1 of 5, S-4.3)
-const APP_VERSION = '0.1.3';
+const APP_VERSION = '0.2.0';
 (function boot() {
   const _tabs = { proposal: 'Proposal', mirror: 'Pricing & mirror', settings: 'Settings' };
   const _go = (t) => TakeoverApp.goTab(t);

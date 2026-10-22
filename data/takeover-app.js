@@ -1,4 +1,7 @@
-/* Sonor Takeover — app logic  v0.1.1 (2026-10-17: the shared project bar 1.14.0 is the picker — ● has-a-proposal via
+/* Sonor Takeover — app logic  v0.2.0 (2026-10-22: the quote is finished — WeQuote "optional" = line active 0; per-area Net Totals read
+   from the client-facing WeQuote proposal PDF (wq-proxy v5 + pdf.js), quote net/VAT/total from quote/get; ⟲ Refresh lines from WeQuote
+   rebuilds every mapped section's expected lines; intro-only areas ignored)
+   v0.1.1 (2026-10-17: the shared project bar 1.14.0 is the picker — ● has-a-proposal via
    decorateOption, unsaved-edits guard via beforeChange, the bar's + New hidden; #project= hash, ?pid= and the old
    sonor_takeover_project memory still open a project)
    v0.1.0 (2026-10-16)
@@ -132,6 +135,7 @@
     $('#o_status').innerHTML = (CFG.statuses || []).map(function (s) { return '<option value="' + s.key + '"' + (p.status === s.key ? ' selected' : '') + '>' + s.label + '</option>'; }).join('');
     $('#o_lang_client').innerHTML = (CFG.languages || []).map(function (l) { return '<option value="' + l.key + '"' + (p.lang_client === l.key ? ' selected' : '') + '>' + l.label + '</option>'; }).join('');
     $('#o_wq_id').value = p.wq_quote_id || ''; $('#o_wq_no').value = p.wq_quote_no || '';
+    if ($('#o_prices')) $('#o_prices').value = p.options.prices_mode || 'reference';
     renderSections(); renderMirror();
   }
   function renderLangPick() {
@@ -147,7 +151,11 @@
     pill.className = 'pill ' + st.pill; pill.textContent = st.label + (S.dirty ? ' · unsaved' : '');
     renderQuoteMarks();
   }
-  function sortedSections() { return (S.cur.sections || []).slice().sort(function (a, b) { return (a.service_nn || '99').localeCompare(b.service_nn || '99') || (a.sort || 0) - (b.sort || 0); }); }
+  // ORDER (Bryn 2026-10-22: "make sure the numbering follows the WQ areas order"): sections follow the WeQuote area order (display_order
+  // from quote/get, remembered in mirror.area_order so the order survives a reload without a check); unmapped sections follow in service order.
+  function areaOrder() { var q = S.wq && S.wq.quote, o = {}; if (q && q.area_groups) { q.area_groups.forEach(function (a) { o[a.id] = a.display_order; }); return o; } return (S.cur && S.cur.mirror && S.cur.mirror.area_order) || {}; }
+  function sectionRank(s, ao) { var k = S.cur ? sectionKey(S.cur, s) : null, sid = k && k[0] === 's' ? k.slice(1) : null; return sid != null && ao[sid] != null ? Number(ao[sid]) : 1000 + Number(s.service_nn || 99) * 10; }
+  function sortedSections() { var ao = areaOrder(); return (S.cur.sections || []).slice().sort(function (a, b) { return sectionRank(a, ao) - sectionRank(b, ao) || (a.service_nn || '99').localeCompare(b.service_nn || '99') || (a.sort || 0) - (b.sort || 0); }); }
   function renderSections() {
     var host = $('#secList'); host.innerHTML = '';
     var secs = sortedSections(), n = 0;
@@ -253,6 +261,7 @@
     $('#saveBtn').onclick = function () { save(); };
     $('#pdfBtn').onclick = function () { exportPdf(); };
     $('#mirrorBtn').onclick = function () { checkMirror(true); };
+    if ($('#refreshLinesBtn')) $('#refreshLinesBtn').onclick = function () { refreshFromQuote(); };
     $('#addSecBtn').onclick = function () { S.cur.sections.push({ key: 'sec_' + Math.random().toString(36).slice(2, 7), service_nn: '10', sort: (S.cur.sections.length + 1) * 10, kind: 'works', wq_area: null, wq_structure_id: null, title: { en: 'New section', es: '' }, do: { en: [], es: [] }, result: { en: '', es: '' }, label: { en: '', es: '' }, lines: [], photos: [], _open: true }); touched(true); renderSections(); };
     function bindText(id, set) { $(id).oninput = function () { set(this.value); touched(true); }; }
     bindText('#f_title', function (v) { S.cur.title[S.lang] = v; });
@@ -268,6 +277,7 @@
     $('#f_internal').oninput = function () { S.cur.internal_notes = lines(this.value); touched(); };
     $('#o_status').onchange = function () { S.cur.status = this.value; touched(); };
     $('#o_lang_client').onchange = function () { S.cur.lang_client = this.value; touched(); renderLangPick(); };
+    if ($('#o_prices')) $('#o_prices').onchange = function () { S.cur.options.prices_mode = this.value; touched(); };
     $('#o_wq_id').oninput = function () { S.cur.wq_quote_id = this.value === '' ? null : +this.value; S.mirror = null; touched(); };
     $('#o_wq_no').oninput = function () { S.cur.wq_quote_no = this.value || null; touched(); };
     window.addEventListener('beforeunload', function (e) { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
@@ -279,7 +289,7 @@
     if (!S.cur) return; if (!S.ready) { toast('Offline — cannot save', 'error'); return; }
     var row = {}; Object.keys(S.cur).forEach(function (k) { if (k[0] !== '_') row[k] = S.cur[k]; });
     row.sections = (row.sections || []).map(function (s) { var o = {}; Object.keys(s).forEach(function (k) { if (k[0] !== '_') o[k] = s[k]; }); return o; });
-    row.mirror = S.mirror ? { status: S.mirror.status, checked_at: S.mirror.at, wq_quote_id: S.mirror.quoteId, issues: S.mirror.issues.length, totals: S.mirror.totals } : (row.mirror || {});
+    row.mirror = S.mirror ? { status: S.mirror.status, checked_at: S.mirror.at, wq_quote_id: S.mirror.quoteId, issues: S.mirror.issues.length, totals: S.mirror.totals, area_order: areaOrder(), template: S.mirror.template || null } : (row.mirror || {});
     var r = await S.db.client.from(CFG.table || 'takeover_proposals').upsert(row, { onConflict: 'id' }).select().single();
     if (r.error) { toast('Save failed: ' + r.error.message, 'error'); return; }
     Object.assign(S.cur, r.data); S.dirty = false; renderStatus(); syncBar(S.cur.project_id);
@@ -305,7 +315,51 @@
   function sectionMapped(p, s) { return !!(s.wq_structure_id || s.wq_area || ((((S.project || {}).metadata || {}).wequote_quote_structure || {}).areas || {})[s.key]); }
   function lineQty(l) { var q = l.quantity != null ? l.quantity : (l.qty != null ? l.qty : l.amount); return q == null ? null : Number(q); }
   function lineArea(l) { return l.structure_description || l.structure_name || l.area_name || l.area || l.structure || l.group_description || ''; }
-  function lineOptional(l) { return !!(l.optional || l.is_optional || l.option || l.optional_item); }
+  // WeQuote's "optional" is the line's active flag: active 0 = shown as an option, excluded from the quote totals (2026-10-22, Woodbrook: Core 5 + Lutron engraving)
+  function lineOptional(l) { return l.active === 0 || l.active === '0' || !!(l.optional || l.is_optional || l.option || l.optional_item); }
+  function isTextLine(l) { return !l.product_id || /^welcome aboard/i.test(l.short_description || ''); }   // intro / TBC custom lines, never priced
+  function isBundleChild(l) { return l.is_bundle_item === 1 || l.is_bundle_item === '1' || l.is_bundle_item === true; }   // the model inside a bundle shell (Draytek under "Enterprise Grade Router") — part of its parent line
+  // ── the client-facing WeQuote proposal PDF → per-area Net Totals (list_quote_lines has NO labour pricing; the PDF is what the client sees) ──
+  var _pdfjsP = null;
+  function loadPdfJs() {
+    if (global.pdfjsLib) return Promise.resolve(global.pdfjsLib);
+    if (_pdfjsP) return _pdfjsP;
+    _pdfjsP = new Promise(function (res, rej) { var sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; sc.onload = function () { try { global.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } catch (e) {} res(global.pdfjsLib); }; sc.onerror = function () { rej(new Error('pdf.js failed to load')); }; document.head.appendChild(sc); });
+    return _pdfjsP;
+  }
+  function norm(t) { return String(t || '').replace(/\s+/g, ' ').replace(/[–—-]/g, '-').trim().toLowerCase(); }
+  async function pdfTextLines(buf) {
+    var pdfjs = await loadPdfJs(), doc = await pdfjs.getDocument({ data: buf }).promise, out = [];
+    for (var pn = 1; pn <= doc.numPages; pn++) {
+      var tc = await (await doc.getPage(pn)).getTextContent(), rows = {};
+      tc.items.forEach(function (it) { if (!it.str || !it.str.trim()) return; var y = Math.round(it.transform[5] / 3) * 3; (rows[y] = rows[y] || []).push({ x: it.transform[4], s: it.str }); });
+      Object.keys(rows).map(Number).sort(function (a, b) { return b - a; }).forEach(function (y) { out.push(rows[y].sort(function (a, b) { return a.x - b.x; }).map(function (i) { return i.s; }).join(' ').replace(/\s+/g, ' ').trim()); });
+    }
+    return out;
+  }
+  // areas: [{id, description}] → { [structure_id]: net total (number) | null }, plus quote-level net when found
+  function areaTotalsFromLines(lines, areas) {
+    var totals = {}, cur = null, money = /£\s?([\d,]+(?:\.\d{1,2})?)/;
+    var byName = {}; areas.forEach(function (a) { byName[norm(a.description)] = a.id; });
+    lines.forEach(function (ln) {
+      var n = norm(ln), m = ln.match(money), amt = m ? Number(m[1].replace(/,/g, '')) : null;
+      Object.keys(byName).forEach(function (nm) {
+        if (n === nm) cur = byName[nm];
+        else if (n.indexOf(nm) === 0 && amt != null && totals[byName[nm]] == null) totals[byName[nm]] = amt;   // summary table row "<area> £x"
+      });
+      if (/net total/i.test(ln) && amt != null && cur != null && totals[cur] == null) { totals[cur] = amt; cur = null; }
+    });
+    return totals;
+  }
+  async function fetchAreaTotals(quote, force) {
+    var C = global.SonorWQClient, t = C.latestTemplate ? C.latestTemplate(quote) : null;
+    if (!t) return { totals: null, note: 'No proposal template generated in WeQuote yet (Quote → Templates)' };
+    try {
+      var buf = await C.proposalPdf(t.id, t.secure_token, { force: !!force });
+      var lines = await pdfTextLines(buf);
+      return { totals: areaTotalsFromLines(lines, quote.area_groups || []), template: { id: t.id, name: t.name, updated: t.updated_datetime, link: t.webLink } };
+    } catch (e) { return { totals: null, note: e.code === 'proxy_no_pdf' ? 'wq-proxy v5 not deployed yet — area totals unavailable (labour lines print as to be confirmed)' : 'Proposal PDF: ' + e.message }; }
+  }
   function lineTotal(l) { var q = lineQty(l) || 0, u = l.sell_price != null ? Number(l.sell_price) : (l.unit_price != null ? Number(l.unit_price) : null); if (l.total_price != null && Number(l.total_price)) return Number(l.total_price); if (l.line_total != null && Number(l.line_total)) return Number(l.line_total); return u == null ? null : q * u; }
   async function checkMirror(force) {
     if (!S.cur) return null;
@@ -314,14 +368,50 @@
     try {
       if (!global.SonorWQClient) throw new Error('SonorWQClient missing');
       var st = global.SonorWQClient.status(); if (!st.ready) await global.SonorWQClient.init(S.db.client);
-      var lines = await global.SonorWQClient.quoteLinesResolved(S.cur.wq_quote_id, !!force);
-      S.wq = { lines: lines, at: new Date().toISOString(), quoteId: S.cur.wq_quote_id };
+      var C = global.SonorWQClient;
+      var lines = await C.quoteLinesResolved(S.cur.wq_quote_id, !!force);
+      var quote = await C.getQuote(S.cur.wq_quote_id);
+      var at = await fetchAreaTotals(quote, force);
+      S.wq = { lines: lines, quote: quote, areaTotals: at.totals, areaNote: at.note || null, template: at.template || null, at: new Date().toISOString(), quoteId: S.cur.wq_quote_id };
     } catch (e) { S.mirror = { status: 'red', issues: [{ level: 'red', msg: 'WeQuote read failed: ' + e.message }], groups: [], totals: {}, at: new Date().toISOString(), quoteId: S.cur.wq_quote_id }; renderMirror(); return S.mirror; }
-    S.mirror = computeMirror(S.cur, S.wq.lines); renderMirror(); return S.mirror;
+    S.mirror = computeMirror(S.cur, S.wq.lines, S.wq); renderMirror(); renderSections(); return S.mirror;
   }
-  function computeMirror(p, wqLines) {
-    var issues = [], groups = [], byArea = {};
-    wqLines.forEach(function (l) { var k = wqLineKey(l); (byArea[k] = byArea[k] || { name: lineArea(l) || (l.structure_id != null ? 'structure ' + l.structure_id : 'quote'), lines: [] }).lines.push(l); });
+  // ⟲ Refresh lines from WeQuote (2026-10-22, Bryn: "the quote is finished … refresh it into the takeover app"): every mapped section's
+  // expected lines are rebuilt from the quote — qty + optional (active) from WeQuote, labels / notes / provisional kept where the
+  // product already existed; expected lines no longer on the quote drop unless they are DO-IN-WEQUOTE (no product yet).
+  async function refreshFromQuote() {
+    if (!S.cur) return; var m = S.mirror || await checkMirror(true); if (!m || !S.wq.lines) return;
+    var byArea = {}; S.wq.lines.forEach(function (l) { var k = wqLineKey(l); (byArea[k] = byArea[k] || []).push(l); });
+    var changed = 0;
+    S.cur.sections.forEach(function (s) {
+      var k = sectionKey(S.cur, s), wl = k && byArea[k]; if (!wl) return;
+      var old = s.lines || [], next = [];
+      var added = [];
+      wl.forEach(function (w) {
+        if (isTextLine(w) || isBundleChild(w)) return;
+        var e = old.find(function (x) { return String(x.product_id) === String(w.product_id) && !x._used; }); if (e) e._used = true;
+        var q = lineQty(w), unit = e ? e.unit : (/per hour|\(per hour\)|hours?$/i.test(w.short_description || '') ? 'h' : (/per day|per man, per day/i.test(w.short_description || '') ? 'day' : (/annual|per year|subscription/i.test(w.short_description || '') ? 'yr' : '')));
+        var ln = { product_id: w.product_id, wq_name: w.short_description || (e && e.wq_name) || String(w.product_id), qty: q, unit: unit, provisional: e ? !!e.provisional : false, optional: lineOptional(w), needs_product: null, note: e ? (e.note || '') : '', label_key: e ? e.label_key : undefined, wq_line_id: w.id, wq_note: w.notes || null };
+        next.push(ln); if (!e) added.push(ln);
+      });
+      // DO-IN-WEQUOTE placeholders: a new product line in the same section fulfils one (its client labels carry over); otherwise the placeholder stays
+      old.forEach(function (e) {
+        if (!e._used && !e.product_id) {
+          var a = added.shift();
+          if (a) { a.provisional = !!e.provisional; a.note = e.note || ''; (CFG.languages || []).forEach(function (l) { var LL = (S.cur.line_labels || {})[l.key] || {}; if (e.label_key && LL[e.label_key] && !LL[String(a.product_id)]) LL[String(a.product_id)] = LL[e.label_key]; }); }
+          else next.push(e);
+        }
+        delete e._used;
+      });
+      if (JSON.stringify(next) !== JSON.stringify(old)) { s.lines = next; changed++; }
+    });
+    if (changed) { touched(); renderSections(); S.mirror = null; await checkMirror(); toast(changed + ' section' + (changed === 1 ? '' : 's') + ' refreshed from WeQuote — Save to keep', 'success'); }
+    else toast('Sections already match the quote');
+  }
+  function computeMirror(p, wqLines, wq) {
+    wq = wq || {}; var issues = [], groups = [], byArea = {}, areaTotals = wq.areaTotals || null, quote = wq.quote || null;
+    if (wq.areaNote) issues.push({ level: 'amber', msg: wq.areaNote });
+    wqLines.forEach(function (l) { if (isBundleChild(l)) return; var k = wqLineKey(l); (byArea[k] = byArea[k] || { name: lineArea(l) || (l.structure_id != null ? 'structure ' + l.structure_id : 'quote'), lines: [] }).lines.push(l); });
     var claimed = {};
     sortedSections().forEach(function (s) {
       if (s.kind === 'noted' && !(s.lines || []).length) return;
@@ -341,11 +431,16 @@
       if (g.wq) pool.forEach(function (w) { g.rows.push({ exp: null, wq: w, state: 'extra' }); issues.push({ level: 'amber', msg: 'Quote area "' + g.wq.name + '" has an extra line: ' + (w.short_description || w.description || w.product_id), section: s.key }); });
       groups.push(g);
     });
-    Object.keys(byArea).forEach(function (k) { if (!claimed[k]) { issues.push({ level: 'amber', msg: 'Quote area "' + byArea[k].name + '" (' + byArea[k].lines.length + ' lines) is not mapped to any section', section: null }); groups.push({ section: null, wq: byArea[k], rows: byArea[k].lines.map(function (w) { return { exp: null, wq: w, state: 'unmapped' }; }) }); } });
-    var works = 0, worksTbc = false, plan = 0, options = 0;
-    wqLines.forEach(function (w) { var t = lineTotal(w), isPlan = /maintenance agreement|service plan/i.test(w.short_description || w.description || ''); if (lineOptional(w)) { options += t || 0; return; } if (t == null) { worksTbc = true; return; } if (isPlan) plan += t; else works += t; });
+    Object.keys(byArea).forEach(function (k) { if (claimed[k]) return; var priced = byArea[k].lines.some(function (w) { return !isTextLine(w); }) || (areaTotals && areaTotals[k.slice(1)] > 0); if (!priced) return;   // intro-only areas ("0 · Takeover Summary") are WeQuote's own narrative, not scope
+      issues.push({ level: 'amber', msg: 'Quote area "' + byArea[k].name + '" (' + byArea[k].lines.length + ' lines) is not mapped to any section', section: null }); groups.push({ section: null, wq: byArea[k], rows: byArea[k].lines.map(function (w) { return { exp: null, wq: w, state: 'unmapped' }; }) }); });
+    // area names + Net Totals from the quote (names) and the proposal PDF (totals) — what the client will actually see
+    var names = {}; ((quote && quote.area_groups) || []).forEach(function (a) { names[a.id] = a.description; });
+    groups.forEach(function (g) { if (!g.wq) return; var sid = (g.wq.lines[0] || {}).structure_id; g.structure_id = sid; if (names[sid]) g.wq.name = names[sid]; g.net = areaTotals && areaTotals[sid] != null ? areaTotals[sid] : null; });
+    var options = 0, optionsTbc = false;
+    wqLines.forEach(function (w) { if (!lineOptional(w) || isBundleChild(w)) return; var t = lineTotal(w); if (t) options += t; else if (!isTextLine(w)) optionsTbc = true; });
+    var net = quote && quote.net_total != null ? Number(quote.net_total) : null;
     var status = issues.some(function (i) { return i.level === 'red'; }) ? 'red' : (issues.length ? 'amber' : 'ok');
-    return { status: status, issues: issues, groups: groups, totals: { works: works, works_tbc: worksTbc, plan: plan, options: options, lines: wqLines.length }, at: new Date().toISOString(), quoteId: p.wq_quote_id };
+    return { status: status, issues: issues, groups: groups, totals: { net: net, vat: quote ? Number(quote.vat_total) : null, gross: quote ? Number(quote.total) : null, labour_hours: quote ? quote.labour_total_hours : null, options: options, options_tbc: optionsTbc, lines: wqLines.length, area: areaTotals || {} }, template: wq.template || null, at: new Date().toISOString(), quoteId: p.wq_quote_id };
   }
   function renderMirror() {
     var el = $('#mirrorStatus'), body = $('#mirrorBody'), cnt = $('#mirrorCount'); if (!el || !body) return;
@@ -355,11 +450,11 @@
     cnt.textContent = String(m.issues.length);
     var h = '';
     if (m.issues.length) h += '<ul class="small" style="margin:8px 0 14px;padding-left:18px">' + m.issues.map(function (i) { return '<li style="color:var(--' + (i.level === 'red' ? 'red' : 'amber') + ')">' + esc(i.msg) + '</li>'; }).join('') + '</ul>';
-    h += '<div class="row wrap small muted" style="margin-bottom:8px"><span>Works (ex VAT): <strong>' + gbp(m.totals.works) + (m.totals.works_tbc ? ' + TBC' : '') + '</strong></span><span>Service plan / yr: <strong>' + gbp(m.totals.plan) + '</strong></span><span>Options: <strong>' + gbp(m.totals.options) + '</strong></span><span>' + m.totals.lines + ' quote lines</span></div>';
+    h += '<div class="row wrap small muted" style="margin-bottom:8px"><span>Quote net (ex VAT): <strong>' + gbp(m.totals.net) + '</strong></span><span>VAT: <strong>' + gbp(m.totals.vat) + '</strong></span><span>Total: <strong>' + gbp(m.totals.gross) + '</strong></span><span>Options (not included): <strong>' + gbp(m.totals.options) + (m.totals.options_tbc ? ' + TBC' : '') + '</strong></span><span>' + (m.totals.labour_hours != null ? m.totals.labour_hours + ' h labour · ' : '') + m.totals.lines + ' quote lines</span>' + (m.template ? '<span>Proposal template: <a href="' + esc(m.template.link) + '" target="_blank" rel="noopener">' + esc(m.template.name) + '</a> (' + esc(m.template.updated) + ')</span>' : '') + '</div>';
     h += '<table class="mir-tbl"><thead><tr><th>Section ↔ WeQuote area</th><th>Line</th><th class="r">Plan qty</th><th class="r">Quote qty</th><th class="r">Sell</th><th class="r">Total</th><th>State</th></tr></thead><tbody>';
     m.groups.forEach(function (g) {
       var hex = g.section ? svcHex(g.section.service_nn) : null;
-      h += '<tr class="grp"' + (hex ? ' style="--svc:' + hex + '"' : '') + '><td colspan="7">' + (g.section ? esc(L(g.section.title)) : '<em>unmapped</em>') + ' <span class="tag">' + esc(g.wq ? g.wq.name : (g.section && g.section.wq_area ? g.section.wq_area + ' · not on quote' : 'no area')) + '</span></td></tr>';
+      h += '<tr class="grp"' + (hex ? ' style="--svc:' + hex + '"' : '') + '><td colspan="5">' + (g.section ? esc(L(g.section.title)) : '<em>unmapped</em>') + ' <span class="tag">' + esc(g.wq ? g.wq.name : (g.section && g.section.wq_area ? g.section.wq_area + ' · not on quote' : 'no area')) + '</span></td><td class="r">' + (g.wq ? (g.net != null ? gbp(g.net) : '<span class="muted">net ?</span>') : '') + '</td><td class="small muted">' + (g.wq ? 'area net' : '') + '</td></tr>';
       g.rows.forEach(function (r) {
         var w = r.wq, cls = r.state === 'ok' ? '' : (r.state === 'missing' ? 'issue-red' : 'issue');
         h += '<tr class="' + cls + '"><td></td><td>' + esc(r.exp ? r.exp.wq_name : (w.short_description || w.description || '')) + (w ? ' ' + wqPill({ title: 'On WeQuote quote' + (S.cur && S.cur.wq_quote_no ? ' #' + S.cur.wq_quote_no : '') + (w.product_id ? ' · product ' + w.product_id : ''), href: wqUrl('quote', S.cur && S.cur.wq_quote_id) }) : (r.exp ? ' ' + wqPill({ off: true, title: r.exp.product_id ? 'Expected product ' + r.exp.product_id + ' is not on the quote' : 'No WeQuote product yet' }) : '')) + (w && w.product_id ? ' <span class="mono muted">' + esc(w.product_id) + '</span>' : '') + (w && lineOptional(w) ? '<span class="tag">option</span>' : '') + (r.exp && r.exp.provisional ? '<span class="tag">prov.</span>' : '') + '</td>' +
@@ -382,7 +477,7 @@
     try {
       toast('Building PDF…');
       await global.TakeoverPdf.generate({
-        proposal: S.cur, project: S.project, lang: S.lang, ui: (CFG.ui || {})[S.lang] || CFG.ui.en, wqLines: S.wq.lines || [], mirror: m,
+        proposal: S.cur, project: S.project, lang: S.lang, ui: (CFG.ui || {})[S.lang] || CFG.ui.en, wqLines: S.wq.lines || [], mirror: m, sections: sortedSections(), quote: S.wq.quote || null, areaTotals: S.wq.areaTotals || (S.cur.mirror && S.cur.mirror.totals && S.cur.mirror.totals.area) || {},
         sectionKeys: (function () { var m = {}; S.cur.sections.forEach(function (s) { m[s.key] = sectionKey(S.cur, s); }); return m; })(), wqLineKey: wqLineKey,
         tiers: S.cur.options.tiers_show ? S.tiers.filter(function (t) { return !(t.metadata || {}).comparison_only || true; }) : [], tierAspects: S.tierAspects, tierProposed: tier ? tier.key : null,
         company: BRAND.company || {}, appVersion: CFG.version, assetBase: '../data/', photoUrl: photoUrl
@@ -399,5 +494,5 @@
     await loadAll();
   }
 
-  global.TakeoverApp = { boot: boot, state: S, goTab: goTab, save: save, exportPdf: exportPdf, checkMirror: checkMirror, computeMirror: computeMirror, newFromTemplate: newFromTemplate, __version: CFG.version };
+  global.TakeoverApp = { boot: boot, state: S, goTab: goTab, save: save, exportPdf: exportPdf, checkMirror: checkMirror, refreshFromQuote: refreshFromQuote, lineOptional: lineOptional, computeMirror: computeMirror, newFromTemplate: newFromTemplate, __version: CFG.version };
 })(typeof window !== 'undefined' ? window : this);

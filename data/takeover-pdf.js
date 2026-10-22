@@ -85,8 +85,12 @@
     (T(p.summary) || []).forEach(function (para1) { para(para1, 10.5, F.r, C.INK2); y += 8; });
     y += 6;
 
-    // sections — service order 01 → 10, renumbered; noted sections carry their eyebrow label instead of a number
-    var secs = (p.sections || []).slice().sort(function (a, b) { return (a.service_nn || '99').localeCompare(b.service_nn || '99') || (a.sort || 0) - (b.sort || 0); });
+    // sections — in WeQuote AREA ORDER (Bryn 2026-10-22), as the app sorted them (m.sections); service order only as the fallback;
+    // renumbered §01…; noted sections carry their eyebrow label instead of a number; sections whose quote lines are ALL optional are tagged
+    var secs = (m.sections || (p.sections || []).slice().sort(function (a, b) { return (a.service_nn || '99').localeCompare(b.service_nn || '99') || (a.sort || 0) - (b.sort || 0); }));
+    var optOf = function (l) { return l.active === 0 || l.active === '0' || !!(l.optional || l.is_optional); };
+    var wqAll = m.wqLines || [], keyOf0 = m.wqLineKey || function (l) { return l.structure_id != null ? 's' + l.structure_id : areaKey(lineArea(l)); };
+    function sectionAllOptional(s) { var k = (m.sectionKeys || {})[s.key] || (s.wq_structure_id ? 's' + s.wq_structure_id : null); if (!k) return (s.lines || []).length > 0 && (s.lines || []).every(function (e) { return e.optional; }); var ls = wqAll.filter(function (l) { return keyOf0(l) === k && l.product_id && !(l.is_bundle_item === 1 || l.is_bundle_item === '1'); }); return ls.length > 0 && ls.every(optOf); }
     heading(U.scope_h, U.scope_h);
     var n = 0;
     secs.forEach(function (s) {
@@ -98,7 +102,9 @@
       ensure(Math.min(hTitle + hDo + hRes + 16, 260));
       var top = y, startP = P;
       P.tracked(isNoted ? String(T(s.label) || U.noted).toUpperCase() : ('§' + String(n).padStart(2, '0')), M + 14, y + 1, 7, F.r, hex, 2.2);
-      P.text(T(s.title), M + 14 + (isNoted ? 44 : 30), y - 2, 12.5, F.b, C.INK); y += hTitle;
+      P.text(T(s.title), M + 14 + (isNoted ? 44 : 30), y - 2, 12.5, F.b, C.INK);
+      if (!isNoted && sectionAllOptional(s)) { var tw0 = F.b.widthOfTextAtSize(T(s.title), 12.5); P.tracked(String(U.option).toUpperCase(), M + 14 + 30 + tw0 + 8, y + 2, 6.5, F.r, C.GOLD, 1.8); }
+      y += hTitle;
       if (dos.length) { P.tracked(U.what_we_do.toUpperCase(), M + 14, y, 6.5, F.r, C.LABEL, 2); y += 11; bullets(dos, 9.5, W - 18, M + 18); }
       if (res) { ensure(hRes); P.tracked(U.result.toUpperCase(), M + 14, y, 6.5, F.r, C.LABEL, 2); y += 11; para(res, 9.5, F.l, C.INK, W - 32, M + 18, 13.5); }
       // service colour bar — drawn after measuring on the page the block ended on (blocks that spilled keep the bar on the first page only)
@@ -119,7 +125,7 @@
 
     // prices — LIVE WeQuote lines, grouped by section (service order) via wq_area; unmapped areas follow
     var wq = m.wqLines || [], byArea = {}, keyOf = m.wqLineKey || function (l) { return l.structure_id != null ? 's' + l.structure_id : areaKey(lineArea(l)); };
-    wq.forEach(function (l) { var k = keyOf(l); (byArea[k] = byArea[k] || { name: lineArea(l), lines: [] }).lines.push(l); });
+    wq.forEach(function (l) { if (l.is_bundle_item === 1 || l.is_bundle_item === '1') return; var k = keyOf(l); (byArea[k] = byArea[k] || { name: lineArea(l), lines: [] }).lines.push(l); });
     var labels = ((p.line_labels || {})[lang] || {}), labelsEn = ((p.line_labels || {}).en || {});
     function lineLabel(w, exp) { var k = String(w.product_id != null ? w.product_id : (exp && exp.label_key) || ''); return labels[k] || (exp && (labels[exp.label_key] || exp.wq_name)) || labelsEn[k] || w.short_description || w.description || k; }
     var groups = [], claimed = {};
@@ -130,7 +136,11 @@
       exp.forEach(function (e, j) { if (!used[j]) rows.push({ product_id: e.product_id, short_description: e.wq_name, quantity: e.qty, _tbc: true, _exp: e }); });
       groups.push({ title: T(s.title), nn: s.service_nn, lines: rows, exp: exp }); });
     Object.keys(byArea).forEach(function (k) { if (!claimed[k]) groups.push({ title: (byArea[k].name || '').replace(/^\s*\d+\s*[·.\-–—]\s*/, '') || (lang === 'es' ? 'Otras partidas' : 'Other items'), nn: '10', lines: byArea[k].lines, exp: [] }); });
-    if (groups.some(function (g) { return g.lines.length; })) {
+    var pricesMode = (p.options || {}).prices_mode || 'reference';   // 2026-10-22 Bryn: "leave pricing off for now … just reference to see the wequote proposal"
+    if (pricesMode !== 'table') {
+      ensure(70); heading(U.prices_h, U.prices_h);
+      para(String(U.prices_ref || '').replace('{no}', p.wq_quote_no || (m.quote && m.quote.quote_no) || '—'), 10, F.r, C.INK2); y += 14;
+    } else if (groups.some(function (g) { return g.lines.length; })) {
       ensure(120); heading(U.prices_h, U.prices_h);
       var cL = M, cQ = M + W * 0.64, cA = A4.w - M, rowH = 15;
       P.tracked(U.price_col.toUpperCase(), cA - F.r.widthOfTextAtSize(U.price_col.toUpperCase(), 6.5) - 6, y, 6.5, F.r, C.LABEL, 1.2); P.tracked(U.qty.toUpperCase(), cQ, y, 6.5, F.r, C.LABEL, 1.2); y += 10; P.hline(M, A4.w - M, y, C.LINE, 0.8); y += 8;

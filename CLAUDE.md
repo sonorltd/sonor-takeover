@@ -1,4 +1,4 @@
-# Takeover — Claude Code Context (v0.1.3)
+# Takeover — Claude Code Context (v0.2.0)
 
 > **v0.1.3 (2026-10-17)** — consistency batch: supabase-js pinned to 2.45.4 + SRI, shared masters synced (project-bar / kit mirror / wq-sync / takeoffs-supabase / wq-push to their masters). No feature change.
 
@@ -31,6 +31,13 @@ Laws (never bend):
 - **Takeover works are access-based and provisional** until visit 1 — the assumptions copy says so; lines carry `provisional`.
 - **Cover / chrome = Service Contracts' luxury look** (`contract-hero.jpg`, airy, brand large, no alpha on the cover, Gilroy), footer
   `<project> · Page N` only (`footerMode('minimal')`), full contact block once on the rear page (`rearPage`, service@sonor.co.uk).
+
+## v0.2.0 (2026-10-22) — the finished quote
+- **Order = WeQuote area order** (Bryn: "make sure the numbering follows the WQ areas order"): sections sort by the quote's `area_groups[].display_order` (via `wq_structure_id`), remembered in `mirror.area_order`; unmapped sections follow in service order. Service colour stays per section.
+- **Optional = WeQuote line `active: 0`** (Core 5 upgrade, Lutron engraving). A section whose quote lines are all optional prints an OPTIONAL tag.
+- **Prices**: `options.prices_mode` — `reference` (default, Bryn: "leave pricing off for now … just reference to see the wequote proposal") prints one paragraph pointing at the Sonor quotation no.; `table` prints the live-line table.
+- **Area Net Totals** come from the client-facing WeQuote proposal PDF (quote/get → templates[] → wq-proxy v5 `/public/print_quote_template` → pdf.js text) because `list_quote_lines` carries no labour pricing. Needs **wq-proxy v5** deployed (`supabase/functions/wq-proxy/index.ts`); until then the mirror notes it and carries on.
+- **⟲ Refresh lines from WeQuote** rebuilds every mapped section's expected lines from the quote (qty + optional from WQ; labels/notes kept; bundle children folded into the parent; a DO-IN-WEQUOTE placeholder is fulfilled by a new product line in the same section).
 
 ## Architecture
 Spine 1.3 SonorShell app, vanilla, graphite. Files:
